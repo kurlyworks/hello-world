@@ -3,30 +3,366 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
     <title>Hello from James</title>
     <style>
-        body {
+        * { box-sizing: border-box; }
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 4rem 2rem;
-            line-height: 1.6;
-            color: #222;
+        }
+        body {
             background-color: #f0eee6;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 1.4s ease;
         }
-        h1 {
-            font-size: 3.5rem;
-            margin-bottom: 1rem;
-            color: #001f54;
+        body.red {
+            background-color: #000;
         }
-        p {
-            font-size: 1.2rem;
+        body.blue {
+            background-color: #e8e3d3;
+        }
+
+        .gate {
+            font-family: ui-monospace, "SF Mono", Menlo, monospace;
+            font-size: clamp(1rem, 2.2vw, 1.35rem);
+            color: #2a261d;
+            transition: opacity 0.6s ease, transform 1.4s cubic-bezier(0.65, 0, 0.35, 1);
+            display: flex;
+            flex-direction: column;
+            gap: 0.3rem;
+        }
+        .gate.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+        .gate.blue-fall {
+            transform: scale(0) rotate(720deg);
+            opacity: 0;
+        }
+        .gate .line {
+            white-space: pre;
+        }
+        .gate .prompt-char {
+            color: #6b6149;
+            margin-right: 0.6ch;
+        }
+        .gate input {
+            font-family: inherit;
+            font-size: inherit;
+            color: inherit;
+            background: transparent;
+            border: none;
+            outline: none;
+            padding: 0;
+            margin: 0;
+            caret-color: #2a261d;
+            width: 14ch;
+        }
+        .gate input.wrong {
+            animation: shake 0.4s;
+            color: #a4321f;
+        }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-8px); }
+            75% { transform: translateX(8px); }
+        }
+
+        /* Red — Matrix rain + terminal greeting */
+        #matrixCanvas {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            transition: opacity 1.4s ease 0.4s;
+            z-index: 1;
+        }
+        #matrixCanvas.visible { opacity: 1; }
+
+        .terminal {
+            position: fixed;
+            top: 1.5rem;
+            left: 1.5rem;
+            right: 1.5rem;
+            z-index: 2;
+            opacity: 0;
+            transition: opacity 0.6s ease;
+            color: #ffffff;
+            font-family: ui-monospace, "SF Mono", Menlo, monospace;
+            font-size: clamp(1.1rem, 2.6vw, 1.6rem);
+            letter-spacing: 0.04em;
+            text-shadow: 0 0 5px rgba(255, 255, 255, 0.45);
+            pointer-events: none;
+        }
+        .terminal.visible { opacity: 1; }
+        .prompt {
+            color: #ffffff;
+            margin-right: 0.4em;
+            text-shadow: 0 0 5px rgba(255, 255, 255, 0.45);
+        }
+        #typed {
+            color: #ffffff;
+            text-shadow: 0 0 5px rgba(255, 255, 255, 0.5), 0 0 12px rgba(255, 255, 255, 0.2);
+        }
+        .cursor {
+            display: inline-block;
+            width: 0.55ch;
+            background: #ffffff;
+            margin-left: 0.15em;
+            vertical-align: -0.1em;
+            animation: blink 1s steps(2, start) infinite;
+            box-shadow: 0 0 6px rgba(255, 255, 255, 0.5);
+        }
+        .cursor::before { content: "\00a0"; }
+        @keyframes blink { to { visibility: hidden; } }
+
+        /* Blue — rabbit hole, wake up */
+        .reveal-blue {
+            position: absolute;
+            opacity: 0;
+            color: #3a3528;
+            font-family: Georgia, "Times New Roman", serif;
+            font-style: italic;
+            font-size: clamp(1.1rem, 2.6vw, 1.6rem);
+            line-height: 1.6;
+            max-width: 36rem;
+            text-align: center;
+            padding: 0 1.5rem;
+            transition: opacity 0.5s ease, transform 0.5s ease;
+            transform: translateY(10px);
+            pointer-events: none;
+        }
+        .reveal-blue.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .blue-cursor {
+            display: inline-block;
+            width: 0.5ch;
+            background: #3a3528;
+            margin-left: 0.1em;
+            vertical-align: -0.05em;
+            animation: blink 1s steps(2, start) infinite;
+        }
+        .blue-cursor::before { content: "\00a0"; }
+        .reveal-blue .small {
+            display: block;
+            margin-top: 1rem;
+            font-style: normal;
+            font-size: 0.85em;
+            opacity: 0;
+            transition: opacity 0.8s ease;
+            font-family: ui-monospace, "SF Mono", Menlo, monospace;
+        }
+        .reveal-blue .small.shown {
+            opacity: 0.6;
+        }
+
+        .tunnel {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.6s ease;
+        }
+        .tunnel.active { opacity: 1; }
+        .tunnel .ring {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            border: 2px solid rgba(120, 100, 70, 0.35);
+            border-radius: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            animation: ripple 2.4s ease-out infinite;
+            width: 100px;
+            height: 100px;
+        }
+        .tunnel .ring:nth-child(1) { animation-delay: 0s; }
+        .tunnel .ring:nth-child(2) { animation-delay: 0.4s; }
+        .tunnel .ring:nth-child(3) { animation-delay: 0.8s; }
+        .tunnel .ring:nth-child(4) { animation-delay: 1.2s; }
+        .tunnel .ring:nth-child(5) { animation-delay: 1.6s; }
+        .tunnel .ring:nth-child(6) { animation-delay: 2.0s; }
+        @keyframes ripple {
+            0%   { transform: translate(-50%, -50%) scale(0);  opacity: 0.8; }
+            100% { transform: translate(-50%, -50%) scale(14); opacity: 0;   }
         }
     </style>
 </head>
 <body>
-    <h1>Hello from James</h1>
-    <p>Welcome! This is a simple page to say hi. Thanks for stopping by.</p>
+    <canvas id="matrixCanvas"></canvas>
+
+    <div class="tunnel" id="tunnel" aria-hidden="true">
+        <span class="ring"></span><span class="ring"></span><span class="ring"></span>
+        <span class="ring"></span><span class="ring"></span><span class="ring"></span>
+    </div>
+
+    <div class="gate" id="gate">
+        <div class="line"><span class="prompt-char">&gt;</span>red or blue</div>
+        <div class="line"><span class="prompt-char">&gt;</span><input type="text" id="pw" autocomplete="off" autofocus spellcheck="false" /></div>
+    </div>
+
+    <div class="terminal" id="terminal">
+        <span class="prompt">&gt;</span><span id="typed"></span><span class="cursor"></span>
+    </div>
+
+    <div class="reveal-blue" id="revealBlue">
+        <div><span id="blueTyped"></span><span class="blue-cursor"></span></div>
+        <span class="small" id="blueCredit">- Morpheus</span>
+    </div>
+
+    <script>
+        const input = document.getElementById('pw');
+        const gate = document.getElementById('gate');
+        const terminal = document.getElementById('terminal');
+        const typed = document.getElementById('typed');
+        const revealBlue = document.getElementById('revealBlue');
+        const blueTyped = document.getElementById('blueTyped');
+        const blueCredit = document.getElementById('blueCredit');
+        const tunnel = document.getElementById('tunnel');
+        const canvas = document.getElementById('matrixCanvas');
+        const body = document.body;
+
+        // Matrix rain
+        const ctx = canvas.getContext('2d');
+        const chars = 'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン0123456789ABCDEFZ:.='.split('');
+        const fontSize = 18;
+        let columns = 0;
+        let drops = [];
+        let rainRunning = false;
+
+        function sizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            columns = Math.floor(canvas.width / fontSize);
+            drops = new Array(columns).fill(0).map(() => Math.random() * -50);
+        }
+        window.addEventListener('resize', sizeCanvas);
+
+        let frameTick = 0;
+        function drawMatrix() {
+            if (!rainRunning) return;
+            frameTick++;
+            if (frameTick % 4 !== 0) {
+                requestAnimationFrame(drawMatrix);
+                return;
+            }
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.08)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.font = fontSize + 'px ui-monospace, "SF Mono", Menlo, monospace';
+            for (let i = 0; i < drops.length; i++) {
+                const text = chars[Math.floor(Math.random() * chars.length)];
+                const x = i * fontSize;
+                const y = drops[i] * fontSize;
+                ctx.fillStyle = Math.random() > 0.975 ? '#bfffd0' : '#00ff41';
+                ctx.fillText(text, x, y);
+                if (y > canvas.height && Math.random() > 0.975) {
+                    drops[i] = 0;
+                }
+                drops[i]++;
+            }
+            requestAnimationFrame(drawMatrix);
+        }
+
+        function typeWelcome() {
+            const message = 'Welcome, Neo';
+            let i = 0;
+            typed.textContent = '';
+            function step() {
+                if (i >= message.length) return;
+                typed.textContent += message[i++];
+                setTimeout(step, 110 + Math.random() * 80);
+            }
+            step();
+        }
+
+        function typeBlueQuote() {
+            const message = '"The story ends. You wake up in your bed and believe whatever you want to believe."';
+            let i = 0;
+            blueTyped.textContent = '';
+            blueCredit.classList.remove('shown');
+            function step() {
+                if (i >= message.length) {
+                    setTimeout(() => blueCredit.classList.add('shown'), 400);
+                    return;
+                }
+                const ch = message[i++];
+                blueTyped.textContent += ch;
+                let delay = 35 + Math.random() * 35;
+                if (ch === '.' || ch === ',') delay = 260;
+                setTimeout(step, delay);
+            }
+            step();
+        }
+
+        function startMatrix() {
+            sizeCanvas();
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            rainRunning = true;
+            requestAnimationFrame(drawMatrix);
+        }
+
+        function resetToHome() {
+            rainRunning = false;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            canvas.classList.remove('visible');
+            terminal.classList.remove('visible');
+            typed.textContent = '';
+            revealBlue.classList.remove('visible');
+            blueTyped.textContent = '';
+            blueCredit.classList.remove('shown');
+            tunnel.classList.remove('active');
+            body.classList.remove('red', 'blue');
+            gate.classList.remove('hidden', 'blue-fall');
+            input.disabled = false;
+            input.value = '';
+            input.classList.remove('wrong');
+            setTimeout(() => input.focus(), 50);
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && (e.key === 'c' || e.key === 'C')) {
+                e.preventDefault();
+                resetToHome();
+            }
+        });
+
+        input.addEventListener('keydown', (e) => {
+            if (e.key !== 'Enter') return;
+            const value = input.value.trim().toLowerCase();
+
+            if (value === 'red') {
+                input.disabled = true;
+                body.classList.add('red');
+                gate.classList.add('hidden');
+                startMatrix();
+                canvas.classList.add('visible');
+                setTimeout(() => terminal.classList.add('visible'), 700);
+                setTimeout(typeWelcome, 1500);
+            } else if (value === 'blue') {
+                input.disabled = true;
+                body.classList.add('blue');
+                tunnel.classList.add('active');
+                gate.classList.add('blue-fall');
+                setTimeout(() => {
+                    revealBlue.classList.add('visible');
+                    typeBlueQuote();
+                }, 500);
+            } else {
+                input.classList.remove('wrong');
+                void input.offsetWidth;
+                input.classList.add('wrong');
+                input.select();
+            }
+        });
+    </script>
 </body>
 </html>
-<p>Auto-deploy test ✨ — pushed at Wed May 20 23:04:00 CEST 2026</p>
